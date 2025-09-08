@@ -29,7 +29,7 @@ steps:
     args: [
       'run', 'deploy', 'neo4j-mcp-server',
       '--image', 'gcr.io/$PROJECT_ID/neo4j-mcp-server:$SHORT_SHA',
-      '--region', 'us-central1',
+      '--region', 'europe-west1',
       '--platform', 'managed',
       '--memory', '512Mi',
       '--cpu', '1',
