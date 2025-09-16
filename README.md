@@ -86,11 +86,6 @@ The default region is set to `europe-west1`. To change it, edit `cloudbuild.yaml
 '--region', 'your-preferred-region',
 ```
 
-Common regions:
-- `us-central1` (US Central)
-- `europe-west1` (Belgium)
-- `asia-east1` (Taiwan)
-
 ### 7. Test Docker Build (Optional but Recommended)
 
 Build and test the container locally:
