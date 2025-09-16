@@ -1,4 +1,4 @@
-# cloudbuild.yaml — GCR + Cloud Build SA + role check
+# cloudbuild.yaml — GCR + explicit runtime SA
 
 substitutions:
   _REGION: "europe-west1"
@@ -13,43 +13,8 @@ options:
   machineType: "E2_HIGHCPU_8"
   logging: "CLOUD_LOGGING_ONLY"
   substitutionOption: "ALLOW_LOOSE"
-  #serviceAccount: "projects/${PROJECT_ID}/serviceAccounts/${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
 
 steps:
-  # ---------------------------
-  # 0. Verify Cloud Build SA roles
-  # ---------------------------
-  - name: "gcr.io/cloud-builders/gcloud"
-    id: "verify-roles"
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        SERVICE_ACCOUNT="projects/${PROJECT_ID}/serviceAccounts/${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
-        REQUIRED_ROLES=("roles/storage.admin" "roles/run.admin" "roles/iam.serviceAccountUser")
-
-        echo "Checking required roles for $$SERVICE_ACCOUNT..."
-        MISSING=0
-        for ROLE in "$${REQUIRED_ROLES[@]}"; do
-          if ! gcloud projects get-iam-policy ${PROJECT_ID} \
-            --flatten="bindings[].members" \
-            --format="value(bindings.role)" \
-            --filter="bindings.members:$$SERVICE_ACCOUNT" | grep -q "$$ROLE"; then
-            echo "❌ Missing role: $$ROLE"
-            MISSING=1
-          else
-            echo "✅ Found role: $$ROLE"
-          fi
-        done
-
-        if [ "$$MISSING" -eq 1 ]; then
-          echo "Error: Cloud Build SA is missing required roles. Exiting."
-          exit 1
-        fi
-
-  # ---------------------------
-  # 1. Build Docker image
-  # ---------------------------
   - name: "gcr.io/cloud-builders/docker"
     id: "build-image"
     args:
@@ -60,25 +25,16 @@ steps:
       - "gcr.io/${PROJECT_ID}/${_SERVICE}:latest"
       - "."
 
-  # ---------------------------
-  # 2. Push Docker image (SHA)
-  # ---------------------------
   - name: "gcr.io/cloud-builders/docker"
     id: "push-sha"
     waitFor: ["build-image"]
     args: ["push", "gcr.io/${PROJECT_ID}/${_SERVICE}:$SHORT_SHA"]
 
-  # ---------------------------
-  # 3. Push Docker image (latest)
-  # ---------------------------
   - name: "gcr.io/cloud-builders/docker"
     id: "push-latest"
     waitFor: ["build-image"]
     args: ["push", "gcr.io/${PROJECT_ID}/${_SERVICE}:latest"]
 
-  # ---------------------------
-  # 4. Deploy to Cloud Run
-  # ---------------------------
   - name: "gcr.io/cloud-builders/gcloud"
     id: "deploy-cloud-run"
     waitFor: ["push-sha"]
