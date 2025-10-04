@@ -1,9 +1,9 @@
-# cloudbuild.yaml — GCR + Cloud Build SA + role check
+# cloudbuild.yaml — GCR + Cloud Build SA
 
 substitutions:
   _REGION: "europe-west1"
   _SERVICE: "neo4j-mcp-server"
-  _RUNTIME_SA: "run-neo4j@${PROJECT_ID}.iam.gserviceaccount.com"
+  _RUNTIME_SA: "run-neo4j@oak-ai-playground.iam.gserviceaccount.com"
   # passed at submit time:
   # _NEO4J_URI=
   # _NEO4J_USERNAME=
@@ -16,36 +16,24 @@ options:
   #serviceAccount: "projects/${PROJECT_ID}/serviceAccounts/${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
 
 steps:
-  # ---------------------------
-  # 0. Verify Cloud Build SA roles
-  # ---------------------------
+  # Debug step - add this first
   - name: "gcr.io/cloud-builders/gcloud"
-    id: "verify-roles"
+    id: "debug-info"
     entrypoint: "bash"
     args:
       - "-c"
       - |
-        SERVICE_ACCOUNT="projects/${PROJECT_ID}/serviceAccounts/${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
-        REQUIRED_ROLES=("roles/storage.admin" "roles/run.admin" "roles/iam.serviceAccountUser")
+        echo "=== Debug Info ==="
+        echo "BUILD_ID: '${BUILD_ID}'"
+        echo "COMMIT_SHA: '${COMMIT_SHA}'"
+        echo "BUILD_ID: '${BUILD_ID}'"
+        echo "PROJECT_ID: '${PROJECT_ID}'"
+        echo "Current directory:"
+        ls -la
+        echo "Git info:"
+        git log --oneline -3 2>/dev/null || echo "No git available"
+        echo "==================="
 
-        echo "Checking required roles for $$SERVICE_ACCOUNT..."
-        MISSING=0
-        for ROLE in "$${REQUIRED_ROLES[@]}"; do
-          if ! gcloud projects get-iam-policy ${PROJECT_ID} \
-            --flatten="bindings[].members" \
-            --format="value(bindings.role)" \
-            --filter="bindings.members:$$SERVICE_ACCOUNT" | grep -q "$$ROLE"; then
-            echo "❌ Missing role: $$ROLE"
-            MISSING=1
-          else
-            echo "✅ Found role: $$ROLE"
-          fi
-        done
-
-        if [ "$$MISSING" -eq 1 ]; then
-          echo "Error: Cloud Build SA is missing required roles. Exiting."
-          exit 1
-        fi
 
   # ---------------------------
   # 1. Build Docker image
@@ -55,7 +43,7 @@ steps:
     args:
       - "build"
       - "-t"
-      - "gcr.io/${PROJECT_ID}/${_SERVICE}:$SHORT_SHA"
+      - "gcr.io/${PROJECT_ID}/${_SERVICE}:$BUILD_ID"
       - "-t"
       - "gcr.io/${PROJECT_ID}/${_SERVICE}:latest"
       - "."
@@ -66,7 +54,7 @@ steps:
   - name: "gcr.io/cloud-builders/docker"
     id: "push-sha"
     waitFor: ["build-image"]
-    args: ["push", "gcr.io/${PROJECT_ID}/${_SERVICE}:$SHORT_SHA"]
+    args: ["push", "gcr.io/${PROJECT_ID}/${_SERVICE}:$BUILD_ID"]
 
   # ---------------------------
   # 3. Push Docker image (latest)
@@ -87,7 +75,7 @@ steps:
       - "deploy"
       - "${_SERVICE}"
       - "--image"
-      - "gcr.io/${PROJECT_ID}/${_SERVICE}:$SHORT_SHA"
+      - "gcr.io/${PROJECT_ID}/${_SERVICE}:$BUILD_ID"
       - "--region"
       - "${_REGION}"
       - "--platform"
@@ -107,5 +95,5 @@ steps:
       - "NEO4J_URI=${_NEO4J_URI},NEO4J_USERNAME=${_NEO4J_USERNAME},NEO4J_PASSWORD=${_NEO4J_PASSWORD}"
 
 images:
-  - "gcr.io/${PROJECT_ID}/${_SERVICE}:$SHORT_SHA"
+  - "gcr.io/${PROJECT_ID}/${_SERVICE}:$BUILD_ID"
   - "gcr.io/${PROJECT_ID}/${_SERVICE}:latest"

@@ -15,15 +15,20 @@ if [ -z "$NEO4J_URI" ] || [ -z "$NEO4J_USERNAME" ] || [ -z "$NEO4J_PASSWORD" ]; 
     exit 1
 fi
 
+# Configure HTTP server settings via environment variables
+export NEO4J_MCP_SERVER_HOST="0.0.0.0"
+export NEO4J_MCP_SERVER_PORT="${PORT}"
+export NEO4J_MCP_SERVER_PATH="/api/mcp/"
+export NEO4J_MCP_SERVER_ALLOWED_HOSTS="neo4j-mcp-server-6336353060.europe-west1.run.app,localhost,127.0.0.1"
+export NEO4J_MCP_SERVER_ALLOW_ORIGINS="*"
+
 # Start MCP server on Cloud Run port with HTTP transport
 echo "Starting mcp-neo4j-cypher server in HTTP mode on port ${PORT}..."
+echo "Allowed hosts: ${NEO4J_MCP_SERVER_ALLOWED_HOSTS}"
 
 # Use HTTP transport mode per Neo4j MCP documentation
 exec mcp-neo4j-cypher \
     --transport http \
-    --server-host "0.0.0.0" \
-    --server-port "${PORT}" \
-    --server-path "/api/mcp/" \
     --db-url "${NEO4J_URI}" \
     --username "${NEO4J_USERNAME}" \
     --password "${NEO4J_PASSWORD}"
