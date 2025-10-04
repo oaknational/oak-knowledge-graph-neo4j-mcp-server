@@ -22,13 +22,13 @@ export NEO4J_MCP_SERVER_PATH="/api/mcp/"
 export NEO4J_MCP_SERVER_ALLOWED_HOSTS="neo4j-mcp-server-6336353060.europe-west1.run.app,localhost,127.0.0.1"
 export NEO4J_MCP_SERVER_ALLOW_ORIGINS="*"
 
-# Start MCP server on Cloud Run port with HTTP transport
-echo "Starting mcp-neo4j-cypher server in HTTP mode on port ${PORT}..."
+# Start MCP server on Cloud Run port with SSE transport
+echo "Starting mcp-neo4j-cypher server in SSE mode on port ${PORT}..."
 echo "Allowed hosts: ${NEO4J_MCP_SERVER_ALLOWED_HOSTS}"
 
-# Use HTTP transport mode per Neo4j MCP documentation
+# Use SSE transport mode for AI SDK SSEClientTransport compatibility
 exec mcp-neo4j-cypher \
-    --transport http \
+    --transport sse \
     --db-url "${NEO4J_URI}" \
     --username "${NEO4J_USERNAME}" \
     --password "${NEO4J_PASSWORD}"
