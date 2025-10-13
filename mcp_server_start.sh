@@ -5,8 +5,6 @@
 set -e
 
 echo "Starting standalone MCP Neo4j server..."
-echo "NEO4J_URI: ${NEO4J_URI}"
-echo "NEO4J_USERNAME: ${NEO4J_USERNAME}"
 echo "PORT: ${PORT}"
 
 # Validate required environment variables
@@ -19,16 +17,22 @@ fi
 export NEO4J_MCP_SERVER_HOST="0.0.0.0"
 export NEO4J_MCP_SERVER_PORT="${PORT}"
 export NEO4J_MCP_SERVER_PATH="/api/mcp/"
-export NEO4J_MCP_SERVER_ALLOWED_HOSTS="neo4j-mcp-server-6336353060.europe-west1.run.app,localhost,127.0.0.1"
-export NEO4J_MCP_SERVER_ALLOW_ORIGINS="*"
+export NEO4J_MCP_SERVER_ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1}"
 
-# Start MCP server on Cloud Run port with SSE transport
-echo "Starting mcp-neo4j-cypher server in SSE mode on port ${PORT}..."
+# CORS configuration - NOTE: Only restricts browser requests, not direct API calls
+# Defaults to "*" (allows all origins). Set ALLOW_ORIGINS to restrict browser access.
+# Example: ALLOW_ORIGINS="https://my-frontend.com,https://app.example.com"
+# WARNING: This does NOT prevent curl, Postman, or server-to-server requests.
+export NEO4J_MCP_SERVER_ALLOW_ORIGINS="${ALLOW_ORIGINS:-*}"
+
+# Start MCP server on Cloud Run port with HTTP transport
+echo "Starting mcp-neo4j-cypher server in HTTP mode on port ${PORT}..."
 echo "Allowed hosts: ${NEO4J_MCP_SERVER_ALLOWED_HOSTS}"
 
-# Use SSE transport mode for AI SDK SSEClientTransport compatibility
+# Use HTTP transport (Streamable HTTP) - recommended as of MCP spec 2025-03-26
+# SSE transport was deprecated in favor of Streamable HTTP
 exec mcp-neo4j-cypher \
-    --transport sse \
+    --transport http \
     --db-url "${NEO4J_URI}" \
     --username "${NEO4J_USERNAME}" \
     --password "${NEO4J_PASSWORD}"
