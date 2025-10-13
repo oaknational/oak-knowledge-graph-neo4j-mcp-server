@@ -10,16 +10,16 @@ WORKDIR /app
 RUN groupadd --gid 1000 mcpbot \
     && useradd --uid 1000 --gid mcpbot --shell /bin/bash --create-home mcpbot
 
-# Install system dependencies (minimal for security)
+# Install dependencies, build package, then remove git to minimize image size
+# curl: Required for healthcheck
+# git: Only needed temporarily for pip install from GitHub
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        curl \
-        git \
-        && rm -rf /var/lib/apt/lists/*
-
-# Install latest MCP Neo4j package from GitHub (supports HTTP transport)
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir "git+https://github.com/neo4j-contrib/mcp-neo4j.git#subdirectory=servers/mcp-neo4j-cypher"
+    && apt-get install -y --no-install-recommends curl git \
+    && pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir "git+https://github.com/neo4j-contrib/mcp-neo4j.git@mcp-neo4j-cypher-v0.4.1#subdirectory=servers/mcp-neo4j-cypher" \
+    && apt-get purge -y git \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy MCP server startup script
 COPY mcp_server_start.sh .

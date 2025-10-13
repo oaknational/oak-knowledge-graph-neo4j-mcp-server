@@ -4,37 +4,17 @@ substitutions:
   _REGION: "europe-west1"
   _SERVICE: "neo4j-mcp-server"
   _RUNTIME_SA: "run-neo4j@oak-ai-playground.iam.gserviceaccount.com"
-  # passed at submit time:
-  # _NEO4J_URI=
-  # _NEO4J_USERNAME=
-  # _NEO4J_PASSWORD=
+  # Required substitutions - must be passed at submit time:
+  _NEO4J_URI: ""
+  _NEO4J_USERNAME: ""
+  _NEO4J_PASSWORD: ""
 
 options:
   machineType: "E2_HIGHCPU_8"
   logging: "CLOUD_LOGGING_ONLY"
-  substitutionOption: "ALLOW_LOOSE"
-  #serviceAccount: "projects/${PROJECT_ID}/serviceAccounts/${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
+  substitutionOption: "MUST_MATCH"
 
 steps:
-  # Debug step - add this first
-  - name: "gcr.io/cloud-builders/gcloud"
-    id: "debug-info"
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        echo "=== Debug Info ==="
-        echo "BUILD_ID: '${BUILD_ID}'"
-        echo "COMMIT_SHA: '${COMMIT_SHA}'"
-        echo "BUILD_ID: '${BUILD_ID}'"
-        echo "PROJECT_ID: '${PROJECT_ID}'"
-        echo "Current directory:"
-        ls -la
-        echo "Git info:"
-        git log --oneline -3 2>/dev/null || echo "No git available"
-        echo "==================="
-
-
   # ---------------------------
   # 1. Build Docker image
   # ---------------------------
@@ -44,12 +24,10 @@ steps:
       - "build"
       - "-t"
       - "gcr.io/${PROJECT_ID}/${_SERVICE}:$BUILD_ID"
-      - "-t"
-      - "gcr.io/${PROJECT_ID}/${_SERVICE}:latest"
       - "."
 
   # ---------------------------
-  # 2. Push Docker image (SHA)
+  # 2. Push Docker image (SHA-tagged for immutable versioning)
   # ---------------------------
   - name: "gcr.io/cloud-builders/docker"
     id: "push-sha"
@@ -57,15 +35,7 @@ steps:
     args: ["push", "gcr.io/${PROJECT_ID}/${_SERVICE}:$BUILD_ID"]
 
   # ---------------------------
-  # 3. Push Docker image (latest)
-  # ---------------------------
-  - name: "gcr.io/cloud-builders/docker"
-    id: "push-latest"
-    waitFor: ["build-image"]
-    args: ["push", "gcr.io/${PROJECT_ID}/${_SERVICE}:latest"]
-
-  # ---------------------------
-  # 4. Deploy to Cloud Run
+  # 3. Deploy to Cloud Run
   # ---------------------------
   - name: "gcr.io/cloud-builders/gcloud"
     id: "deploy-cloud-run"
@@ -92,8 +62,7 @@ steps:
       - "10"
       - "--allow-unauthenticated"
       - "--set-env-vars"
-      - "NEO4J_URI=${_NEO4J_URI},NEO4J_USERNAME=${_NEO4J_USERNAME},NEO4J_PASSWORD=${_NEO4J_PASSWORD}"
+      - "NEO4J_URI=${_NEO4J_URI},NEO4J_USERNAME=${_NEO4J_USERNAME},NEO4J_PASSWORD=${_NEO4J_PASSWORD},ALLOWED_HOSTS=${_SERVICE}-${PROJECT_NUMBER}.${_REGION}.run.app"
 
 images:
   - "gcr.io/${PROJECT_ID}/${_SERVICE}:$BUILD_ID"
-  - "gcr.io/${PROJECT_ID}/${_SERVICE}:latest"

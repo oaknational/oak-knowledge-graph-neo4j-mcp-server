@@ -1,129 +1,83 @@
 # Neo4j MCP Server on Google Cloud Run
 
-This repository contains everything needed to deploy a Neo4j MCP (Model Context Protocol) server on Google Cloud Run. The server provides HTTP-based access to Neo4j databases using the MCP protocol.
+Deploy a Neo4j MCP (Model Context Protocol) server to Google Cloud Run. This server provides HTTP-based access to your Neo4j database through the MCP protocol, enabling AI assistants like Claude to query and interact with your graph database.
 
-## Prerequisites
+## What You'll Need
 
-- A Google Cloud Platform account with billing enabled
-- A Neo4j database (cloud or self-hosted) with connection details
-- Docker installed locally (for testing)
-- Git installed
+- Google Cloud Platform account with billing enabled
+- Neo4j database (cloud or self-hosted) with connection credentials
+- Git installed on your machine
 
-## Step-by-Step Installation
+## Quick Start
 
-### 1. Clone the Repository
+### 1. Clone and Configure
 
 ```bash
+# Clone this repository
 git clone <your-repo-url>
 cd oak-knowledge-graph-neo4j-mcp-server
-```
 
-### 2. Set Up Environment Variables
-
-Create your environment file:
-```bash
+# Create environment file from template
 cp .env.example .env
 ```
 
-Edit `.env` with your Neo4j connection details:
+Edit `.env` and add your Neo4j credentials:
 ```bash
-# Example values - replace with your actual Neo4j instance details
 NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your-password
-PORT=8080
+NEO4J_PASSWORD=your-secure-password
 ```
 
-### 3. Install Google Cloud CLI
+### 2. Install Google Cloud CLI
 
-**On macOS:**
+**macOS:**
 ```bash
-# Using Homebrew (recommended)
 brew install --cask google-cloud-sdk
-
-# Or download from: https://cloud.google.com/sdk/docs/install
 ```
 
-**On Linux:**
+**Linux:**
 ```bash
 curl https://sdk.cloud.google.com | bash
 exec -l $SHELL
 ```
 
-**On Windows:**
-Download the installer from: https://cloud.google.com/sdk/docs/install
+**Windows:**
+Download from: https://cloud.google.com/sdk/docs/install
 
-### 4. Configure Google Cloud CLI
+### 3. Configure Google Cloud
 
-Initialize gcloud and authenticate:
 ```bash
+# Initialize and authenticate
 gcloud init
-```
 
-Follow the prompts to:
-- Log in to your Google account
-- Select or create a GCP project
-- Choose a default region (recommend: europe-west1 for Europe, us-central1 for US)
-
-Verify your configuration:
-```bash
-gcloud config get-value project
-gcloud config get-value compute/region
-```
-
-### 5. Enable Required Google Cloud APIs
-
-```bash
+# Enable required APIs
 gcloud services enable cloudbuild.googleapis.com
 gcloud services enable run.googleapis.com
 gcloud services enable containerregistry.googleapis.com
 ```
 
-### 6. Configure Deployment Region (Optional)
+When running `gcloud init`, choose or create a project and select a region (e.g., `us-central1` or `europe-west1`).
 
-The default region is set to `europe-west1`. To change it, edit `cloudbuild.yaml`:
-```yaml
-'--region', 'your-preferred-region',
-```
+### 4. Deploy to Cloud Run
 
-### 7. Test Docker Build (Optional but Recommended)
-
-Build and test the container locally:
 ```bash
-# Build the container
-docker build -t neo4j-mcp-test .
+# Load environment variables
+source .env
 
-# Verify the MCP executable is installed
-docker run --rm neo4j-mcp-test which mcp-neo4j-cypher
-
-# Test with your environment (replace with your .env values)
-docker run --rm \
-  -e NEO4J_URI="your-neo4j-uri" \
-  -e NEO4J_USERNAME="your-username" \
-  -e NEO4J_PASSWORD="your-password" \
-  -p 8080:8080 \
-  neo4j-mcp-test
-```
-
-### 8. Deploy to Google Cloud Run
-
-Deploy using Cloud Build:
-```bash
+# Deploy
 gcloud builds submit --config=cloudbuild.yaml \
   --substitutions=_NEO4J_URI="${NEO4J_URI}",_NEO4J_USERNAME="${NEO4J_USERNAME}",_NEO4J_PASSWORD="${NEO4J_PASSWORD}"
 ```
 
-**Note:** This command reads your environment variables and passes them to Cloud Build. Make sure your `.env` file is properly configured.
-
-### 9. Verify Deployment
-
-After successful deployment, you'll see output like:
+Deployment takes 2-5 minutes. When complete, you'll see:
 ```
-Service [neo4j-mcp-server] revision [neo4j-mcp-server-00001-xxx] has been deployed and is serving 100 percent of traffic.
-Service URL: https://neo4j-mcp-server-xxx-ew.a.run.app
+Service [neo4j-mcp-server] has been deployed.
+Service URL: https://neo4j-mcp-server-xxxxx-xx.a.run.app
 ```
 
-Test the deployed service:
+### 5. Verify It Works
+
+Test your deployed server:
 ```bash
 curl -X POST https://your-service-url/api/mcp/ \
   -H "Content-Type: application/json" \
@@ -131,138 +85,38 @@ curl -X POST https://your-service-url/api/mcp/ \
   -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
 ```
 
-You should see a response listing available tools:
+You should see a JSON response listing three available tools:
 - `get_neo4j_schema` - Get database schema
 - `read_neo4j_cypher` - Execute read queries
 - `write_neo4j_cypher` - Execute write queries
 
-## Configuration Files
+## Using Your MCP Server
 
-- **`Dockerfile`** - Container configuration for the MCP server
-- **`mcp_server_start.sh`** - Startup script that launches the MCP server
-- **`cloudbuild.yaml`** - Google Cloud Build configuration for deployment
-- **`.env.example`** - Template for environment variables
-- **`.env`** - Your actual environment variables (not committed to git)
+### With Claude Desktop
 
-## Environment Variables
+Add this configuration to your Claude Desktop MCP settings:
 
-### Core Environment Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `NEO4J_URI` | Neo4j connection string | `neo4j+s://xxx.databases.neo4j.io` |
-| `NEO4J_USERNAME` | Neo4j username | `neo4j` |
-| `NEO4J_PASSWORD` | Neo4j password | `your-secure-password` |
-| `PORT` | Server port (managed by Cloud Run) | `8080` |
-
-### HTTP Server Configuration (Automatically Set)
-
-The startup script automatically configures these environment variables for Cloud Run:
-
-| Variable | Description | Default Value |
-|----------|-------------|---------------|
-| `NEO4J_MCP_SERVER_HOST` | Server bind address | `0.0.0.0` |
-| `NEO4J_MCP_SERVER_PORT` | Server port | `${PORT}` (from Cloud Run) |
-| `NEO4J_MCP_SERVER_PATH` | API endpoint path | `/api/mcp/` |
-| `NEO4J_MCP_SERVER_ALLOWED_HOSTS` | Allowed hostnames | Cloud Run hostname + localhost |
-| `NEO4J_MCP_SERVER_ALLOW_ORIGINS` | CORS origins | `*` |
-
-## Usage
-
-Once deployed, your MCP server will be available at:
-```
-https://neo4j-mcp-server-[HASH].[REGION].a.run.app/api/mcp/
+```json
+{
+  "mcpServers": {
+    "neo4j": {
+      "url": "https://your-service-url/api/mcp/",
+      "transport": "http"
+    }
+  }
+}
 ```
 
-The server accepts MCP protocol requests for Neo4j Cypher query execution. You can integrate it with Claude Desktop or other MCP-compatible clients.
+Restart Claude Desktop. You can now ask Claude to query your Neo4j database:
+- "What's the schema of my Neo4j database?"
+- "Run a query to find all nodes"
+- "Create a new node with these properties"
 
-## Troubleshooting
+### With Other MCP Clients
 
-### Common Issues
+This server uses **Streamable HTTP transport** (MCP spec 2025-03-26) and works with any MCP-compatible client. Send JSON-RPC requests to `/api/mcp/` endpoint.
 
-**1. "gcloud: command not found"**
-```bash
-# Reinstall Google Cloud CLI
-brew install --cask google-cloud-sdk
-# Or follow installation instructions above
-```
-
-**2. "Permission denied" errors**
-```bash
-# Ensure you're authenticated
-gcloud auth login
-gcloud auth application-default login
-```
-
-**3. "API not enabled" errors**
-```bash
-# Enable required APIs
-gcloud services enable cloudbuild.googleapis.com run.googleapis.com
-```
-
-**4. Neo4j connection errors**
-- Verify your Neo4j instance is running and accessible
-- Check your connection string format
-- Ensure credentials are correct
-- Test connection from your local machine first
-
-**5. Build failures**
-```bash
-# Check build logs
-gcloud builds list
-gcloud builds log [BUILD-ID]
-```
-
-**6. "Invalid host header" errors**
-This usually means the MCP server isn't configured to accept requests from the Cloud Run hostname. The startup script should automatically configure this, but if you see this error:
-
-- Verify your `mcp_server_start.sh` sets `NEO4J_MCP_SERVER_ALLOWED_HOSTS`
-- Check the logs to see what hostname Cloud Run is using
-- Ensure the environment variables are being exported correctly
-
-**7. Server won't start or times out**
-```bash
-# Check recent logs
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=neo4j-mcp-server" --limit=20 --format="value(timestamp,textPayload)" --freshness=1d
-```
-
-### Viewing Logs
-
-Check Cloud Run service logs:
-```bash
-# For recent logs
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=neo4j-mcp-server" --limit=50 --format="value(timestamp,textPayload)" --freshness=1d
-
-# For live logs (if service is running)
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=neo4j-mcp-server" --follow
-```
-
-### Updating the Service
-
-To update after making changes:
-```bash
-gcloud builds submit --config=cloudbuild.yaml \
-  --substitutions=_NEO4J_URI="${NEO4J_URI}",_NEO4J_USERNAME="${NEO4J_USERNAME}",_NEO4J_PASSWORD="${NEO4J_PASSWORD}"
-```
-
-## MCP Integration
-
-### Available Tools
-
-Once deployed, your server provides these MCP tools:
-
-1. **`get_neo4j_schema`** - Get database schema (nodes, relationships, properties)
-2. **`read_neo4j_cypher`** - Execute read-only Cypher queries
-3. **`write_neo4j_cypher`** - Execute write Cypher queries (destructive)
-
-### Using with MCP Clients
-
-The server uses Server-Sent Events (SSE) over HTTP, making it compatible with:
-- Claude Desktop (via MCP configuration)
-- OpenAI with MCP integration
-- Custom MCP clients
-
-**Example MCP request:**
+Example query request:
 ```bash
 curl -X POST https://your-service-url/api/mcp/ \
   -H "Content-Type: application/json" \
@@ -272,23 +126,152 @@ curl -X POST https://your-service-url/api/mcp/ \
     "method":"tools/call",
     "params":{
       "name":"read_neo4j_cypher",
-      "arguments":{"query":"MATCH (n) RETURN count(n) as total_nodes"}
+      "arguments":{"query":"MATCH (n) RETURN count(n) as total"}
     },
     "id":1
   }'
 ```
 
-## Security Notes
+## Configuration
 
-- The service is deployed with `--allow-unauthenticated` for easy testing
-- For production, remove this flag and set up proper authentication
-- Consider using Google Secret Manager for sensitive credentials
-- The container runs as a non-root user for security
-- Host validation prevents unauthorized access attempts
+### Environment Variables
 
-## Cost Optimization
+Required variables (set in `.env`):
 
-- The service uses minimal resources (512Mi memory, 1 CPU)
-- Cloud Run only charges when the service is handling requests
-- Automatic scaling down to zero when not in use
-- Consider setting `--max-instances` based on your expected load
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NEO4J_URI` | Neo4j connection string | `neo4j+s://abc.databases.neo4j.io` |
+| `NEO4J_USERNAME` | Neo4j username | `neo4j` |
+| `NEO4J_PASSWORD` | Neo4j password | `your-password` |
+
+Optional variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ALLOWED_HOSTS` | Comma-separated list of allowed hostnames | Auto-configured |
+| `ALLOW_ORIGINS` | CORS allowed origins (browser requests only) | `*` (all origins) |
+
+### Deployment Settings
+
+Edit `cloudbuild.yaml` to customize:
+
+```yaml
+substitutions:
+  _REGION: "europe-west1"  # Change deployment region
+  _SERVICE: "neo4j-mcp-server"  # Change service name
+  _RUNTIME_SA: "your-service-account@project.iam.gserviceaccount.com"
+```
+
+Resource limits (in `cloudbuild.yaml`):
+- Memory: 512Mi (adjustable with `--memory` flag)
+- CPU: 1 (adjustable with `--cpu` flag)
+- Max instances: 10 (adjustable with `--max-instances` flag)
+
+## Maintenance
+
+### Update After Code Changes
+
+```bash
+source .env
+gcloud builds submit --config=cloudbuild.yaml \
+  --substitutions=_NEO4J_URI="${NEO4J_URI}",_NEO4J_USERNAME="${NEO4J_USERNAME}",_NEO4J_PASSWORD="${NEO4J_PASSWORD}"
+```
+
+### View Logs
+
+```bash
+# Recent logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=neo4j-mcp-server" \
+  --limit=50 --freshness=1d
+
+# Live streaming logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=neo4j-mcp-server" \
+  --follow
+```
+
+### Check Build History
+
+```bash
+gcloud builds list --limit=10
+gcloud builds log [BUILD-ID]
+```
+
+## Troubleshooting
+
+**Authentication errors:**
+```bash
+gcloud auth login
+gcloud auth application-default login
+```
+
+**API not enabled:**
+```bash
+gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com
+```
+
+**Neo4j connection fails:**
+- Verify your Neo4j instance is running and accessible
+- Test credentials using Neo4j Browser or another client
+- Check that your connection string uses the correct protocol (`neo4j+s://` for encrypted)
+
+**Build fails:**
+```bash
+# Check logs for the failed build
+gcloud builds list
+gcloud builds log [BUILD-ID]
+```
+
+**Deployment fails:**
+- Ensure all required substitution variables are provided
+- Verify your service account has necessary permissions
+- Check that your project has billing enabled
+
+## Security Considerations
+
+**Current security posture:**
+- ✅ HTTPS encryption for all traffic (enforced by Cloud Run)
+- ✅ Container runs as non-root user
+- ⚠️ Service is publicly accessible (`--allow-unauthenticated`)
+
+**The `--allow-unauthenticated` flag means:**
+- Anyone with the URL can send requests to your MCP server
+- No authentication is required to access Neo4j through the MCP interface
+- Suitable for development, testing, or internal tools
+- **Not recommended for production with sensitive data**
+
+**For production deployments:**
+1. Remove `--allow-unauthenticated` from `cloudbuild.yaml`
+2. Use Google Cloud IAM for authentication
+3. Store credentials in Google Secret Manager instead of environment variables
+4. Restrict CORS origins in `ALLOW_ORIGINS` if serving browser clients
+5. Regularly rotate Neo4j credentials
+6. Set up monitoring and alerting for unusual access patterns
+
+## Cost Information
+
+**Cloud Run pricing:**
+- Only charged when handling requests (pay-per-use)
+- Automatically scales to zero when not in use
+- Uses minimal resources (512Mi memory, 1 CPU)
+
+**Cloud Build pricing:**
+- Uses `E2_HIGHCPU_8` machine for faster builds
+- To reduce costs, change `machineType` in `cloudbuild.yaml` to `E2_HIGHCPU_4` or default
+
+**Estimated costs for light usage:**
+- ~$1-5/month for occasional requests
+- Refer to Google Cloud pricing calculator for your specific usage
+
+## What's Included
+
+- **`Dockerfile`** - Defines the container with MCP Neo4j server (v0.4.1)
+- **`mcp_server_start.sh`** - Startup script that configures and launches the server
+- **`cloudbuild.yaml`** - Cloud Build configuration for automated deployment
+- **`.env.example`** - Template for environment variables
+
+## Resources
+
+- [MCP Specification](https://spec.modelcontextprotocol.io/)
+- [Neo4j MCP Server GitHub](https://github.com/neo4j-contrib/mcp-neo4j)
+- [Google Cloud Run Documentation](https://cloud.google.com/run/docs)
+- [Neo4j Documentation](https://neo4j.com/docs/)
